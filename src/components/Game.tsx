@@ -187,6 +187,14 @@ const Game: React.FC = () => {
       }, 1000);
       
       return () => clearTimeout(timer);
+    } else if (countdownActiveRef.current && countdown === 0) {
+      // Safety check to ensure the countdown is deactivated even if it reaches 0
+      const timer = setTimeout(() => {
+        countdownActiveRef.current = false;
+        console.log("Countdown safety reset triggered, game resumed");
+      }, 1000);
+      
+      return () => clearTimeout(timer);
     }
   }, [countdown, countdownActiveRef.current]);
   
@@ -597,63 +605,35 @@ const Game: React.FC = () => {
           // Update bananas
           gameStateRef.current.bananas.forEach((banana, index) => {
             banana.position.y -= gameStateRef.current.speed;
-            banana.rotation.z += 0.02; // Add rotation animation to bananas
 
-            // Check collision with monkey - using radius-based collision
-            // For complex objects we approximate their bounds with circles
-            if (gameStateRef.current.monkey) {
-              const monkeyPos = gameStateRef.current.monkey.position;
-              const bananaPos = banana.position;
+            // Check for banana collision with monkey
+            if (gameStateRef.current.monkey && 
+                Math.abs(banana.position.x - gameStateRef.current.monkey.position.x) < 0.5 &&
+                Math.abs(banana.position.y - gameStateRef.current.monkey.position.y) < 0.5) {
               
-              // Calculate distance between monkey and banana centers
-              const dx = monkeyPos.x - bananaPos.x;
-              const dy = monkeyPos.y - bananaPos.y;
-              const distance = Math.sqrt(dx * dx + dy * dy);
-              
-              // If distance is less than combined radii, collision has occurred
-              // Adjusted collision radius for new models
-              if (distance < 0.5) {  // 0.3 (monkey) + 0.2 (banana)
               scene.remove(banana);
               gameStateRef.current.bananas.splice(index, 1);
               gameStateRef.current.score += 1;
               setDisplayScore(gameStateRef.current.score);
-                
-                // Increase difficulty based on score
-                if (gameStateRef.current.score % 15 === 0) {
-                  // Significant speed increase every 15 bananas (making it smaller)
-                  const oldSpeed = gameStateRef.current.speed;
-                  // Reduce the increment from 0.02 to 0.01 (half as fast)
-                  gameStateRef.current.speed = Math.min(0.12, oldSpeed + 0.01);
-                  
-                  // Force a new banana spawn after level up
-                  lastSpawnTimeRef.current = 0;
-                } else {
-                  // Small increase for each banana
-                  gameStateRef.current.speed += 0.0005;
-                }
-                
-                // Play collect sound
-                playCollectSound();
-                
-                // Show happy emotion when collecting banana
-                if (gameStateRef.current.monkey) {
-                  // Force happy emotion and visual feedback
-                  setMonkeyEmotion(gameStateRef.current.monkey, "happy");
-                  
-                  // Make sure the expressions are properly visible
-                  gameStateRef.current.monkey.traverse((child) => {
-                    if (child.name === "happyMouth") child.visible = true;
-                    if (child.name === "sadMouth") child.visible = false;
-                  });
-                  
-                  // Visual feedback - make monkey slightly bigger briefly
-                  gameStateRef.current.monkey.scale.set(1.2, 1.2, 1);
-                  setTimeout(() => {
-                    if (gameStateRef.current.monkey && !gameStateRef.current.isGameOver) {
-                      gameStateRef.current.monkey.scale.set(1, 1, 1);
-                    }
-                  }, 150);
-                }
+              
+              // Increase speed gradually with score
+              if (gameStateRef.current.score % 5 === 0) {
+                gameStateRef.current.speed += 0.005;
+                console.log(`Speed increased to: ${gameStateRef.current.speed.toFixed(3)}`);
+              }
+              
+              // Add a bigger boost every 15 points
+              if (gameStateRef.current.score % 15 === 0) {
+                gameStateRef.current.speed += 0.01;
+                console.log(`MAJOR speed boost! Speed now: ${gameStateRef.current.speed.toFixed(3)}`);
+              }
+              
+              // Play collect sound
+              playCollectSound();
+              
+              // Show happy emotion on collection
+              if (gameStateRef.current.monkey) {
+                setMonkeyEmotion(gameStateRef.current.monkey, "happy");
               }
             }
 
@@ -721,6 +701,7 @@ const Game: React.FC = () => {
         }
       }
 
+      // Always render the scene, regardless of game state
       renderer.render(scene, camera);
       animationFrameRef.current = requestAnimationFrame(animate);
     };
@@ -785,6 +766,12 @@ const Game: React.FC = () => {
 
   const handleRestart = () => {
     if (!sceneRef.current) return;
+    
+    // Prevent multiple restarts while countdown is active
+    if (countdownActiveRef.current) {
+      console.log("Restart blocked: countdown already active");
+      return;
+    }
 
     // Cancel any running animation frame to prevent overlap
     if (animationFrameRef.current) {
@@ -901,10 +888,8 @@ const Game: React.FC = () => {
       }
     }, 500);
     
-    // Start countdown timer
-    setTimeout(() => {
-      countdownActiveRef.current = false;
-    }, 3000);
+    // Remove the timer that sets countdownActiveRef to false - we'll let the useEffect handle this
+    console.log("Game restarted, countdown active");
   };
 
   // Function to change monkey emotion
