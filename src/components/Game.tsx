@@ -82,10 +82,25 @@ const Game: React.FC = () => {
     const playBackgroundMusic = () => {
       if (!audioEnabled) return;
       try {
+        // Reset the playback position
         backgroundMusic.currentTime = 0;
-        backgroundMusic.play().catch(e => {
-          console.error("Error playing background music:", e);
-        });
+        
+        // Create a user interaction-driven function to play the audio
+        const playAudio = () => {
+          backgroundMusic.play().catch(e => {
+            console.error("Error playing background music:", e);
+            // On Chrome, we need user interaction, so we'll set a flag to play on first click
+            document.addEventListener('click', function playOnClick() {
+              backgroundMusic.play().catch(err => console.error("Error on click play:", err));
+              document.removeEventListener('click', playOnClick);
+            }, { once: true });
+          });
+        };
+        
+        // Try to play immediately
+        playAudio();
+        
+        console.log("Background music play requested");
       } catch (e) {
         console.error("Error starting background music:", e);
       }
@@ -94,6 +109,7 @@ const Game: React.FC = () => {
     const stopBackgroundMusic = () => {
       try {
         backgroundMusic.pause();
+        console.log("Background music paused");
       } catch (e) {
         console.error("Error stopping background music:", e);
       }
@@ -120,14 +136,34 @@ const Game: React.FC = () => {
       } as any
     };
     
-    // Play music when enabled
+    // Play music when enabled - with a slight delay to ensure DOM is ready
     if (audioEnabled) {
-      playBackgroundMusic();
+      // Try playing after a short delay
+      setTimeout(() => {
+        playBackgroundMusic();
+      }, 500);
+      
+      // Also set up a click handler for first user interaction
+      const handleFirstInteraction = () => {
+        if (audioRef.current?.backgroundMusic) {
+          audioRef.current.backgroundMusic.play();
+          window.removeEventListener('click', handleFirstInteraction);
+          window.removeEventListener('keydown', handleFirstInteraction);
+          console.log("Music started on user interaction");
+        }
+      };
+      
+      // Add event listeners for first interaction
+      window.addEventListener('click', handleFirstInteraction);
+      window.addEventListener('keydown', handleFirstInteraction);
     }
     
     return () => {
       // Stop all sounds on cleanup
       stopBackgroundMusic();
+      // Remove any event listeners
+      window.removeEventListener('click', function(){});
+      window.removeEventListener('keydown', function(){});
     };
   }, [audioEnabled]);
   
