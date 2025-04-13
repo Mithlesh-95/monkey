@@ -724,57 +724,120 @@ const Game: React.FC = () => {
     };
   }, []);
 
-  const handleRestart = () => {
-    if (!sceneRef.current || !gameStateRef.current.monkey) return;
+  // Helper function to reset the scene
+  const resetScene = () => {
+    if (!sceneRef.current) return;
+    
+    // Save camera and essential objects
+    const scene = sceneRef.current;
+    const essentialObjects: THREE.Object3D[] = [];
+    
+    // Find and save essential objects like background, lights, etc.
+    scene.traverse((object) => {
+      if (object.type === 'AmbientLight' || object.type === 'DirectionalLight' || 
+          object.name === 'background' || object.type === 'Camera') {
+        essentialObjects.push(object);
+      }
+    });
+    
+    // Clear everything from the scene
+    while (scene.children.length > 0) {
+      scene.remove(scene.children[0]);
+    }
+    
+    // Add back essential objects
+    essentialObjects.forEach(obj => {
+      scene.add(obj);
+    });
+    
+    // Create a new monkey
+    const monkey = createMonkey();
+    monkey.position.y = -2.5;
+    scene.add(monkey);
+    
+    return monkey;
+  };
 
-    // Reset game state
-    gameStateRef.current = {
-      ...INITIAL_STATE,
-      monkey: gameStateRef.current.monkey,
-    };
+  const handleRestart = () => {
+    if (!sceneRef.current) return;
+
+    // Check if we need a full scene reset
+    let needsFullReset = false;
+    if (!gameStateRef.current.monkey || !gameStateRef.current.monkey.visible) {
+      needsFullReset = true;
+    } else {
+      // Check if monkey parts are missing
+      let monkeyPartsCount = 0;
+      gameStateRef.current.monkey.traverse((child) => {
+        if (child.type === 'Mesh' || child.type === 'Group') {
+          monkeyPartsCount++;
+        }
+      });
+      // If we have less than 10 parts, the monkey is probably corrupted
+      if (monkeyPartsCount < 10) {
+        needsFullReset = true;
+      }
+    }
+
+    // Perform full reset if needed
+    if (needsFullReset) {
+      console.log("Performing full scene reset");
+      const newMonkey = resetScene();
+      
+      // Reset game state with new monkey
+      gameStateRef.current = {
+        ...INITIAL_STATE,
+        monkey: newMonkey,
+      };
+    } else {
+      // Reset game state with existing monkey
+      gameStateRef.current = {
+        ...INITIAL_STATE,
+        monkey: gameStateRef.current.monkey,
+      };
+      
+      // Reset existing monkey
+      gameStateRef.current.monkey.position.x = 0;
+      setMonkeyEmotion(gameStateRef.current.monkey, "happy");
+      gameStateRef.current.monkey.scale.set(1, 1, 1);
+      gameStateRef.current.monkey.rotation.set(0, 0, 0);
+      gameStateRef.current.monkey.visible = true;
+      
+      // Remove all bananas from the scene
+      if (sceneRef.current) {
+        const bananasToRemove = [...gameStateRef.current.bananas];
+        bananasToRemove.forEach(banana => {
+          sceneRef.current?.remove(banana);
+        });
+      }
+    }
 
     // Reset spawn interval and timing
     lastSpawnTimeRef.current = 0;
     spawnIntervalRef.current = 2000;
-
-    // Reset monkey position and emotion
-    gameStateRef.current.monkey.position.x = 0;
-    setMonkeyEmotion(gameStateRef.current.monkey, "happy");
     
-    // Reset scale and rotation
-    gameStateRef.current.monkey.scale.set(1, 1, 1);
-    gameStateRef.current.monkey.rotation.set(0, 0, 0);
-
-    // Ensure all bananas are properly removed from both the scene and game state
-    if (sceneRef.current) {
-      // Get a copy of the bananas array to safely iterate while removing
-      const bananasToRemove = [...gameStateRef.current.bananas];
-      
-      // Remove each banana from the scene
-      bananasToRemove.forEach(banana => {
-      sceneRef.current?.remove(banana);
-    });
-      
-      // Clear the bananas array
-    gameStateRef.current.bananas = [];
-      
-      // Double-check and remove any remaining objects with the name "banana"
-      sceneRef.current.traverse((object) => {
-        if (object.type === 'Group' && object.position.y < 3 && object.position.y > -3) {
-          sceneRef.current?.remove(object);
-        }
-      });
-    }
-
     // Reset UI state
     setDisplayScore(0);
     setDisplayLives(3);
     setGameOver(false);
+    setCountdown(3);
     
-    // Always enable audio when restarting
+    // Clear bananas array
+    gameStateRef.current.bananas = [];
+    
+    // Double-check and remove any remaining objects with the name "banana"
+    if (sceneRef.current) {
+      sceneRef.current.traverse((object) => {
+        if (object.name === "banana" || (object.type === 'Group' && object.position.y < 3 && object.position.y > -3)) {
+          sceneRef.current?.remove(object);
+        }
+      });
+    }
+    
+    // Make sure audio is enabled
     setAudioEnabled(true);
     
-    // Let the audio system catch up before playing
+    // Play background music after a short delay to ensure audio context is ready
     setTimeout(() => {
       if (audioRef.current?.backgroundMusic) {
         audioRef.current.backgroundMusic.play();
