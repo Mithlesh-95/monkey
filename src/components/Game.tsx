@@ -40,6 +40,8 @@ const Game: React.FC = () => {
   const [audioMessage, setAudioMessage] = useState("");
   const spawnIntervalRef = useRef(2000);
   const lastSpawnTimeRef = useRef(0);
+  const [countdown, setCountdown] = useState(3);
+  const countdownActiveRef = useRef(false);
 
   // Initialize audio assets
   useEffect(() => {
@@ -168,6 +170,25 @@ const Game: React.FC = () => {
       stopBackgroundMusic();
     };
   }, [audioEnabled]);
+  
+  // Countdown effect
+  useEffect(() => {
+    if (countdownActiveRef.current && countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(prev => prev - 1);
+        
+        // When countdown reaches 1, prepare to end countdown
+        if (countdown === 1) {
+          setTimeout(() => {
+            countdownActiveRef.current = false;
+            console.log("Countdown ended, game resumed");
+          }, 1000);
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [countdown, countdownActiveRef.current]);
   
   // Function to toggle audio
   const toggleAudio = () => {
@@ -548,152 +569,156 @@ const Game: React.FC = () => {
     let monkeyAnimationTime = 0;
 
     const animate = (time: number) => {
+      // Always render the scene even during countdown
       if (!gameStateRef.current.isGameOver) {
-        // Spawn new bananas - with dynamic spawn rate
-        const currentSpawnInterval = getSpawnInterval();
-        if (time - lastSpawnTimeRef.current > currentSpawnInterval) {
-          spawnBanana();
-          lastSpawnTimeRef.current = time;
-          
-          // Debug info - log every 5 bananas spawned to avoid console flood
-          if (gameStateRef.current.bananas.length % 5 === 0) {
-            console.log(`Bananas in scene: ${gameStateRef.current.bananas.length}, Spawn interval: ${currentSpawnInterval}ms, Speed: ${gameStateRef.current.speed.toFixed(3)}`);
+        if (!countdownActiveRef.current) {
+          // Only run game logic if countdown is not active
+          // Spawn new bananas - with dynamic spawn rate
+          const currentSpawnInterval = getSpawnInterval();
+          if (time - lastSpawnTimeRef.current > currentSpawnInterval) {
+            spawnBanana();
+            lastSpawnTimeRef.current = time;
+            
+            // Debug info - log every 5 bananas spawned to avoid console flood
+            if (gameStateRef.current.bananas.length % 5 === 0) {
+              console.log(`Bananas in scene: ${gameStateRef.current.bananas.length}, Spawn interval: ${currentSpawnInterval}ms, Speed: ${gameStateRef.current.speed.toFixed(3)}`);
+            }
           }
-        }
-        
-        // Animate monkey (subtle breathing/bouncing effect)
-        if (gameStateRef.current.monkey) {
-          // Use new emotion animation system instead of simple breathing
-          animateMonkeyEmotion(gameStateRef.current.monkey, time);
           
-          // Store current position for next frame
-          gameStateRef.current.monkey.userData.lastX = gameStateRef.current.monkey.position.x;
-        }
-
-        // Update bananas
-        gameStateRef.current.bananas.forEach((banana, index) => {
-          banana.position.y -= gameStateRef.current.speed;
-          banana.rotation.z += 0.02; // Add rotation animation to bananas
-
-          // Check collision with monkey - using radius-based collision
-          // For complex objects we approximate their bounds with circles
+          // Animate monkey (subtle breathing/bouncing effect)
           if (gameStateRef.current.monkey) {
-            const monkeyPos = gameStateRef.current.monkey.position;
-            const bananaPos = banana.position;
+            // Use new emotion animation system instead of simple breathing
+            animateMonkeyEmotion(gameStateRef.current.monkey, time);
             
-            // Calculate distance between monkey and banana centers
-            const dx = monkeyPos.x - bananaPos.x;
-            const dy = monkeyPos.y - bananaPos.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            // If distance is less than combined radii, collision has occurred
-            // Adjusted collision radius for new models
-            if (distance < 0.5) {  // 0.3 (monkey) + 0.2 (banana)
-            scene.remove(banana);
-            gameStateRef.current.bananas.splice(index, 1);
-            gameStateRef.current.score += 1;
-            setDisplayScore(gameStateRef.current.score);
+            // Store current position for next frame
+            gameStateRef.current.monkey.userData.lastX = gameStateRef.current.monkey.position.x;
+          }
+          
+          // Update bananas
+          gameStateRef.current.bananas.forEach((banana, index) => {
+            banana.position.y -= gameStateRef.current.speed;
+            banana.rotation.z += 0.02; // Add rotation animation to bananas
+
+            // Check collision with monkey - using radius-based collision
+            // For complex objects we approximate their bounds with circles
+            if (gameStateRef.current.monkey) {
+              const monkeyPos = gameStateRef.current.monkey.position;
+              const bananaPos = banana.position;
               
-              // Increase difficulty based on score
-              if (gameStateRef.current.score % 15 === 0) {
-                // Significant speed increase every 15 bananas (making it smaller)
-                const oldSpeed = gameStateRef.current.speed;
-                // Reduce the increment from 0.02 to 0.01 (half as fast)
-                gameStateRef.current.speed = Math.min(0.12, oldSpeed + 0.01);
+              // Calculate distance between monkey and banana centers
+              const dx = monkeyPos.x - bananaPos.x;
+              const dy = monkeyPos.y - bananaPos.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              
+              // If distance is less than combined radii, collision has occurred
+              // Adjusted collision radius for new models
+              if (distance < 0.5) {  // 0.3 (monkey) + 0.2 (banana)
+              scene.remove(banana);
+              gameStateRef.current.bananas.splice(index, 1);
+              gameStateRef.current.score += 1;
+              setDisplayScore(gameStateRef.current.score);
                 
-                // Force a new banana spawn after level up
-                lastSpawnTimeRef.current = 0;
-              } else {
-                // Small increase for each banana
-                gameStateRef.current.speed += 0.0005;
+                // Increase difficulty based on score
+                if (gameStateRef.current.score % 15 === 0) {
+                  // Significant speed increase every 15 bananas (making it smaller)
+                  const oldSpeed = gameStateRef.current.speed;
+                  // Reduce the increment from 0.02 to 0.01 (half as fast)
+                  gameStateRef.current.speed = Math.min(0.12, oldSpeed + 0.01);
+                  
+                  // Force a new banana spawn after level up
+                  lastSpawnTimeRef.current = 0;
+                } else {
+                  // Small increase for each banana
+                  gameStateRef.current.speed += 0.0005;
+                }
+                
+                // Play collect sound
+                playCollectSound();
+                
+                // Show happy emotion when collecting banana
+                if (gameStateRef.current.monkey) {
+                  // Force happy emotion and visual feedback
+                  setMonkeyEmotion(gameStateRef.current.monkey, "happy");
+                  
+                  // Make sure the expressions are properly visible
+                  gameStateRef.current.monkey.traverse((child) => {
+                    if (child.name === "happyMouth") child.visible = true;
+                    if (child.name === "sadMouth") child.visible = false;
+                  });
+                  
+                  // Visual feedback - make monkey slightly bigger briefly
+                  gameStateRef.current.monkey.scale.set(1.2, 1.2, 1);
+                  setTimeout(() => {
+                    if (gameStateRef.current.monkey && !gameStateRef.current.isGameOver) {
+                      gameStateRef.current.monkey.scale.set(1, 1, 1);
+                    }
+                  }, 150);
+                }
               }
+            }
+
+            // Check if banana hit ground
+            if (banana.position.y < -3) {
+              scene.remove(banana);
+              gameStateRef.current.bananas.splice(index, 1);
+              gameStateRef.current.lives -= 1;
+              setDisplayLives(gameStateRef.current.lives);
               
-              // Play collect sound
-              playCollectSound();
+              // Play lose life sound
+              playLoseLifeSound();
               
-              // Show happy emotion when collecting banana
+              // Show sad emotion when losing a life
               if (gameStateRef.current.monkey) {
-                // Force happy emotion and visual feedback
-                setMonkeyEmotion(gameStateRef.current.monkey, "happy");
+                setMonkeyEmotion(gameStateRef.current.monkey, "sad");
                 
-                // Make sure the expressions are properly visible
-                gameStateRef.current.monkey.traverse((child) => {
-                  if (child.name === "happyMouth") child.visible = true;
-                  if (child.name === "sadMouth") child.visible = false;
-                });
-                
-                // Visual feedback - make monkey slightly bigger briefly
-                gameStateRef.current.monkey.scale.set(1.2, 1.2, 1);
+                // Reset to happy after 1.5 seconds if game not over
                 setTimeout(() => {
                   if (gameStateRef.current.monkey && !gameStateRef.current.isGameOver) {
-                    gameStateRef.current.monkey.scale.set(1, 1, 1);
+                    setMonkeyEmotion(gameStateRef.current.monkey, "happy");
                   }
-                }, 150);
+                }, 1500);
+              }
+
+              if (gameStateRef.current.lives <= 0) {
+                gameStateRef.current.isGameOver = true;
+                setGameOver(true);
+                
+                // Force audio disabled state to stop background music
+                setAudioEnabled(false);
+                
+                // Set crying emotion when game over
+                if (gameStateRef.current.monkey) {
+                  setMonkeyEmotion(gameStateRef.current.monkey, "crying");
+                }
+                
+                // Play game over sound manually without audio enabled state
+                setTimeout(() => {
+                  try {
+                    // Create a one-time game over sound
+                    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.type = 'square';
+                    oscillator.frequency.value = 200;
+                    gainNode.gain.value = 0.3;
+                    
+                    oscillator.start();
+                    setTimeout(() => {
+                      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
+                      setTimeout(() => oscillator.stop(), 100);
+                    }, 500);
+                  } catch (e) {
+                    console.error("Error playing game over sound:", e);
+                  }
+                }, 100);
               }
             }
-          }
-
-          // Check if banana hit ground
-          if (banana.position.y < -3) {
-            scene.remove(banana);
-            gameStateRef.current.bananas.splice(index, 1);
-            gameStateRef.current.lives -= 1;
-            setDisplayLives(gameStateRef.current.lives);
-            
-            // Play lose life sound
-            playLoseLifeSound();
-            
-            // Show sad emotion when losing a life
-            if (gameStateRef.current.monkey) {
-              setMonkeyEmotion(gameStateRef.current.monkey, "sad");
-              
-              // Reset to happy after 1.5 seconds if game not over
-              setTimeout(() => {
-                if (gameStateRef.current.monkey && !gameStateRef.current.isGameOver) {
-                  setMonkeyEmotion(gameStateRef.current.monkey, "happy");
-                }
-              }, 1500);
-            }
-
-            if (gameStateRef.current.lives <= 0) {
-              gameStateRef.current.isGameOver = true;
-              setGameOver(true);
-              
-              // Force audio disabled state to stop background music
-              setAudioEnabled(false);
-              
-              // Set crying emotion when game over
-              if (gameStateRef.current.monkey) {
-                setMonkeyEmotion(gameStateRef.current.monkey, "crying");
-              }
-              
-              // Play game over sound manually without audio enabled state
-              setTimeout(() => {
-                try {
-                  // Create a one-time game over sound
-                  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-                  const oscillator = audioContext.createOscillator();
-                  const gainNode = audioContext.createGain();
-                  
-                  oscillator.connect(gainNode);
-                  gainNode.connect(audioContext.destination);
-                  
-                  oscillator.type = 'square';
-                  oscillator.frequency.value = 200;
-                  gainNode.gain.value = 0.3;
-                  
-                  oscillator.start();
-                  setTimeout(() => {
-                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
-                    setTimeout(() => oscillator.stop(), 100);
-                  }, 500);
-                } catch (e) {
-                  console.error("Error playing game over sound:", e);
-                }
-              }, 100);
-            }
-          }
-        });
+          });
+        }
       }
 
       renderer.render(scene, camera);
@@ -761,6 +786,11 @@ const Game: React.FC = () => {
   const handleRestart = () => {
     if (!sceneRef.current) return;
 
+    // Cancel any running animation frame to prevent overlap
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
     // Check if we need a full scene reset
     let needsFullReset = false;
     if (!gameStateRef.current.monkey || !gameStateRef.current.monkey.visible) {
@@ -821,28 +851,60 @@ const Game: React.FC = () => {
     setDisplayLives(3);
     setGameOver(false);
     setCountdown(3);
+    countdownActiveRef.current = true;
     
-    // Clear bananas array
+    // Clear bananas array BEFORE removing objects to prevent any further processing
     gameStateRef.current.bananas = [];
     
     // Double-check and remove any remaining objects with the name "banana"
     if (sceneRef.current) {
+      let bananasRemoved = 0;
       sceneRef.current.traverse((object) => {
         if (object.name === "banana" || (object.type === 'Group' && object.position.y < 3 && object.position.y > -3)) {
           sceneRef.current?.remove(object);
+          bananasRemoved++;
         }
       });
+      console.log(`Removed ${bananasRemoved} remaining bananas from scene`);
     }
     
-    // Make sure audio is enabled
-    setAudioEnabled(true);
+    // Make sure audio is enabled and properly initialized
+    if (!audioEnabled) {
+      setAudioEnabled(true);
+      // Create and resume AudioContext on restart
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const context = new AudioContextClass();
+        
+        // Resume context if needed
+        if (context.state !== 'running') {
+          context.resume().then(() => {
+            console.log('AudioContext resumed successfully on restart');
+          }).catch(error => {
+            console.error('Failed to resume AudioContext on restart:', error);
+          });
+        }
+      } catch (e) {
+        console.error('Failed to initialize AudioContext on restart:', e);
+      }
+    }
     
     // Play background music after a short delay to ensure audio context is ready
     setTimeout(() => {
       if (audioRef.current?.backgroundMusic) {
-        audioRef.current.backgroundMusic.play();
+        try {
+          audioRef.current.backgroundMusic.play();
+          console.log("Background music started");
+        } catch (e) {
+          console.error("Failed to play background music:", e);
+        }
       }
-    }, 100);
+    }, 500);
+    
+    // Start countdown timer
+    setTimeout(() => {
+      countdownActiveRef.current = false;
+    }, 3000);
   };
 
   // Function to change monkey emotion
@@ -1001,6 +1063,15 @@ const Game: React.FC = () => {
             {audioEnabled ? "🔊 Sound On" : "🔇 Enable Sound"}
           </button>
         </div>
+
+      {/* Countdown overlay */}
+      {countdownActiveRef.current && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 z-30">
+          <div className="text-white text-8xl font-bold animate-pulse">
+            {countdown}
+          </div>
+        </div>
+      )}
         
       {gameOver && (
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-20">
