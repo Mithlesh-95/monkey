@@ -73,69 +73,29 @@ const Game: React.FC = () => {
       };
     };
 
-    // Background music controller
-    let bgMusicTimer: number | null = null;
+    // Create actual audio elements for the game sounds
+    const backgroundMusic = new Audio('/audio/WhatsApp Audio 2025-04-13 at 17.56.29_5ededef5.mp3');
+    backgroundMusic.loop = true;
+    backgroundMusic.volume = 0.4;
     
-    // Create the background music player
+    // Background music controller
     const playBackgroundMusic = () => {
       if (!audioEnabled) return;
-      
-      // Clear any existing timers
-      if (bgMusicTimer) {
-        clearTimeout(bgMusicTimer);
-        bgMusicTimer = null;
+      try {
+        backgroundMusic.currentTime = 0;
+        backgroundMusic.play().catch(e => {
+          console.error("Error playing background music:", e);
+        });
+      } catch (e) {
+        console.error("Error starting background music:", e);
       }
-      
-      // Define notes and durations directly without using them as parameters
-      const notes = [262, 330, 392, 523, 392, 330];
-      const durations = [400, 400, 400, 600, 400, 600];
-      let currentIndex = 0;
-      
-      const playNextNote = () => {
-        if (!audioEnabled) return;
-        
-        try {
-          const osc = audioContext.createOscillator();
-          const gain = audioContext.createGain();
-          
-          osc.connect(gain);
-          gain.connect(audioContext.destination);
-          
-          // Use a nicer sounding waveform
-          osc.type = 'triangle';
-          osc.frequency.value = notes[currentIndex];
-          gain.gain.value = 0.03;
-          
-          // Add envelope for smoother sound
-          gain.gain.setValueAtTime(0, audioContext.currentTime);
-          gain.gain.linearRampToValueAtTime(0.03, audioContext.currentTime + 0.01);
-          gain.gain.linearRampToValueAtTime(0.015, audioContext.currentTime + durations[currentIndex]/1000 - 0.05);
-          gain.gain.linearRampToValueAtTime(0, audioContext.currentTime + durations[currentIndex]/1000);
-          
-          osc.start();
-          osc.stop(audioContext.currentTime + durations[currentIndex]/1000);
-          
-          // Get the current duration before changing the index
-          const currentDuration = durations[currentIndex];
-          
-          // Move to next note
-          currentIndex = (currentIndex + 1) % notes.length;
-          
-          // Schedule next note with the current duration
-          bgMusicTimer = window.setTimeout(playNextNote, currentDuration);
-        } catch (e) {
-          console.error("Error playing note:", e);
-        }
-      };
-      
-      // Start with the first note
-      playNextNote();
     };
     
     const stopBackgroundMusic = () => {
-      if (bgMusicTimer) {
-        clearTimeout(bgMusicTimer);
-        bgMusicTimer = null;
+      try {
+        backgroundMusic.pause();
+      } catch (e) {
+        console.error("Error stopping background music:", e);
       }
     };
     
