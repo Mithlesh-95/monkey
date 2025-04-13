@@ -74,7 +74,7 @@ const Game: React.FC = () => {
     };
 
     // Create actual audio elements for the game sounds
-    const backgroundMusic = new Audio('/audio/WhatsApp Audio 2025-04-13 at 17.56.29_5ededef5.mp3');
+    const backgroundMusic = new Audio('./audio/WhatsApp Audio 2025-04-13 at 17.56.29_5ededef5.mp3');
     backgroundMusic.loop = true;
     backgroundMusic.volume = 0.4;
     
