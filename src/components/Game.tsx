@@ -588,7 +588,7 @@ const Game: React.FC = () => {
           // Spawn new bananas - with dynamic spawn rate
           const currentSpawnInterval = getSpawnInterval();
           if (time - lastSpawnTimeRef.current > currentSpawnInterval) {
-            spawnBanana();
+          spawnBanana();
             lastSpawnTimeRef.current = time;
             
             // Debug info - log every 5 bananas spawned to avoid console flood
@@ -604,21 +604,21 @@ const Game: React.FC = () => {
             
             // Store current position for next frame
             gameStateRef.current.monkey.userData.lastX = gameStateRef.current.monkey.position.x;
-          }
-          
-          // Update bananas
-          gameStateRef.current.bananas.forEach((banana, index) => {
-            banana.position.y -= gameStateRef.current.speed;
+        }
+
+        // Update bananas
+        gameStateRef.current.bananas.forEach((banana, index) => {
+          banana.position.y -= gameStateRef.current.speed;
 
             // Check for banana collision with monkey
-            if (gameStateRef.current.monkey && 
+          if (gameStateRef.current.monkey && 
                 Math.abs(banana.position.x - gameStateRef.current.monkey.position.x) < 0.5 &&
                 Math.abs(banana.position.y - gameStateRef.current.monkey.position.y) < 0.5) {
               
-              scene.remove(banana);
-              gameStateRef.current.bananas.splice(index, 1);
-              gameStateRef.current.score += 1;
-              setDisplayScore(gameStateRef.current.score);
+            scene.remove(banana);
+            gameStateRef.current.bananas.splice(index, 1);
+            gameStateRef.current.score += 1;
+            setDisplayScore(gameStateRef.current.score);
               
               // Increase speed gradually with score
               if (gameStateRef.current.score % 5 === 0) {
@@ -639,14 +639,14 @@ const Game: React.FC = () => {
               if (gameStateRef.current.monkey) {
                 setMonkeyEmotion(gameStateRef.current.monkey, "happy");
               }
-            }
+          }
 
-            // Check if banana hit ground
-            if (banana.position.y < -3) {
-              scene.remove(banana);
-              gameStateRef.current.bananas.splice(index, 1);
-              gameStateRef.current.lives -= 1;
-              setDisplayLives(gameStateRef.current.lives);
+          // Check if banana hit ground
+          if (banana.position.y < -3) {
+            scene.remove(banana);
+            gameStateRef.current.bananas.splice(index, 1);
+            gameStateRef.current.lives -= 1;
+            setDisplayLives(gameStateRef.current.lives);
               
               // Play lose life sound
               playLoseLifeSound();
@@ -663,9 +663,9 @@ const Game: React.FC = () => {
                 }, 1500);
               }
 
-              if (gameStateRef.current.lives <= 0) {
-                gameStateRef.current.isGameOver = true;
-                setGameOver(true);
+            if (gameStateRef.current.lives <= 0) {
+              gameStateRef.current.isGameOver = true;
+              setGameOver(true);
                 
                 // Force audio disabled state to stop background music
                 setAudioEnabled(false);
@@ -816,13 +816,13 @@ const Game: React.FC = () => {
       };
     } else {
       // Reset game state with existing monkey
-      gameStateRef.current = {
-        ...INITIAL_STATE,
-        monkey: gameStateRef.current.monkey,
-      };
-      
+    gameStateRef.current = {
+      ...INITIAL_STATE,
+      monkey: gameStateRef.current.monkey,
+    };
+
       // Reset existing monkey
-      gameStateRef.current.monkey.position.x = 0;
+    gameStateRef.current.monkey.position.x = 0;
       setMonkeyEmotion(gameStateRef.current.monkey, "happy");
       gameStateRef.current.monkey.scale.set(1, 1, 1);
       gameStateRef.current.monkey.rotation.set(0, 0, 0);
@@ -832,15 +832,15 @@ const Game: React.FC = () => {
       if (sceneRef.current) {
         const bananasToRemove = [...gameStateRef.current.bananas];
         bananasToRemove.forEach(banana => {
-          sceneRef.current?.remove(banana);
-        });
+      sceneRef.current?.remove(banana);
+    });
       }
     }
 
     // Reset spawn interval and timing
     lastSpawnTimeRef.current = 0;
     spawnIntervalRef.current = 2000;
-    
+
     // Reset UI state
     setDisplayScore(0);
     setDisplayLives(3);
@@ -1078,7 +1078,7 @@ const Game: React.FC = () => {
             <h2 className="text-3xl font-bold mb-4">Game Over!</h2>
             <p className="text-xl mb-4">Final Score: {displayScore}</p>
             <button
-              onClick={handleRestart}
+              onClick={() => window.location.reload()}
               className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
             >
               Play Again
