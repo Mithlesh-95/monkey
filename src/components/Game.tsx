@@ -173,30 +173,29 @@ const Game: React.FC = () => {
   
   // Countdown effect
   useEffect(() => {
-    if (countdownActiveRef.current && countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown(prev => prev - 1);
+    // Only run when countdown is active and has a valid value
+    if (countdownActiveRef.current) {
+      console.log(`Countdown value: ${countdown}`);
+      
+      if (countdown > 0) {
+        // Set timer for next countdown value
+        const timer = setTimeout(() => {
+          setCountdown(countdown - 1);
+        }, 1000);
         
-        // When countdown reaches 1, prepare to end countdown
-        if (countdown === 1) {
-          setTimeout(() => {
-            countdownActiveRef.current = false;
-            console.log("Countdown ended, game resumed");
-          }, 1000);
-        }
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    } else if (countdownActiveRef.current && countdown === 0) {
-      // Safety check to ensure the countdown is deactivated even if it reaches 0
-      const timer = setTimeout(() => {
-        countdownActiveRef.current = false;
-        console.log("Countdown safety reset triggered, game resumed");
-      }, 1000);
-      
-      return () => clearTimeout(timer);
+        return () => clearTimeout(timer);
+      } 
+      else if (countdown === 0) {
+        // When countdown reaches zero, wait 1 second then end countdown
+        const timer = setTimeout(() => {
+          countdownActiveRef.current = false;
+          console.log("Countdown complete, game resumed");
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+      }
     }
-  }, [countdown, countdownActiveRef.current]);
+  }, [countdown]);
   
   // Function to toggle audio
   const toggleAudio = () => {
@@ -577,6 +576,11 @@ const Game: React.FC = () => {
     let monkeyAnimationTime = 0;
 
     const animate = (time: number) => {
+      // Debug every few seconds to avoid flooding the console
+      if (time % 1000 < 10) {
+        console.log(`Animation frame: gameOver=${gameStateRef.current.isGameOver}, countdownActive=${countdownActiveRef.current}, countdown=${countdown}`);
+      }
+      
       // Always render the scene even during countdown
       if (!gameStateRef.current.isGameOver) {
         if (!countdownActiveRef.current) {
@@ -765,7 +769,11 @@ const Game: React.FC = () => {
   };
 
   const handleRestart = () => {
-    if (!sceneRef.current) return;
+    console.log("handleRestart called");
+    if (!sceneRef.current) {
+      console.log("No scene ref, cannot restart");
+      return;
+    }
     
     // Prevent multiple restarts while countdown is active
     if (countdownActiveRef.current) {
@@ -837,8 +845,6 @@ const Game: React.FC = () => {
     setDisplayScore(0);
     setDisplayLives(3);
     setGameOver(false);
-    setCountdown(3);
-    countdownActiveRef.current = true;
     
     // Clear bananas array BEFORE removing objects to prevent any further processing
     gameStateRef.current.bananas = [];
@@ -888,8 +894,16 @@ const Game: React.FC = () => {
       }
     }, 500);
     
-    // Remove the timer that sets countdownActiveRef to false - we'll let the useEffect handle this
-    console.log("Game restarted, countdown active");
+    // Start countdown as the final step - after everything else is prepared
+    setCountdown(3);
+    countdownActiveRef.current = true;
+    console.log("Game restarted, countdown set to 3, countdownActive=true");
+    
+    // Restart animation frame if it was canceled
+    if (!animationFrameRef.current) {
+      console.log("Restarting animation frame");
+      animationFrameRef.current = requestAnimationFrame(animate);
+    }
   };
 
   // Function to change monkey emotion
@@ -1053,7 +1067,7 @@ const Game: React.FC = () => {
       {countdownActiveRef.current && (
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 z-30">
           <div className="text-white text-8xl font-bold animate-pulse">
-            {countdown}
+            {countdown > 0 ? countdown : "GO!"}
           </div>
         </div>
       )}
